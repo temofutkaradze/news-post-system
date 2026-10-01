@@ -1,0 +1,332 @@
+{
+  "name": "News Post Generator (free, crop)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## News Post Generator (free, no AI)\n\n**Setup**\n1. Telegram credential (bot token) on: Telegram Trigger, Get File, Send Reply, Send Document.\n2. Run Gotenberg: docker run -d --restart unless-stopped -p 3000:3000 gotenberg/gotenberg:8\n3. Optional: set ALLOWED_CHAT_ID in 'Parse Message'.\n4. Activate the workflow.\n\n**Usage** (send images as FILE for full quality)\n- Single: Author | quote with *yellow words*\n- Circle left: L: Author | quote  (then send circle image)\n- Circle right: R: Author | quote  (then send circle image)\n- Optional IG caption: ... || caption text\n\n**Crop:** add [c:x,y,zoom] (circle) and/or [b:x,y,zoom] (background) to the caption. x,y = % point of the photo to center, zoom >= 1. Use crop-picker.html to get the numbers.",
+        "height": 400,
+        "width": 560
+      },
+      "id": "c8cf6ca8-1b20-4ff6-89de-0290cf57ae23",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        -288
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "d8e40859-8e99-4d3b-b3d2-968f500fef15",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1072,
+        32
+      ],
+      "webhookId": "news-post-free-webhook",
+      "credentials": {
+        "telegramApi": {
+          "id": "ojZSiFZeJCIVnD6O",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===== CONFIG =====\nconst ALLOWED_CHAT_ID = '';   // shen telegram chat id (optional)\n// ==================\nconst msg = $input.first().json.message;\nif (!msg) return [];\nconst chat_id = msg.chat.id;\nif (ALLOWED_CHAT_ID && String(chat_id) !== String(ALLOWED_CHAT_ID)) return [];\nconst sd = $getWorkflowStaticData('global');\nsd.pending = sd.pending || {};\nconst raw = (msg.caption || msg.text || '').trim();\nlet fileId = null;\nif (msg.document && ((msg.document.mime_type || '').startsWith('image/') || /\\.(jpe?g|png|webp)$/i.test(msg.document.file_name || ''))) fileId = msg.document.file_id;\nelse if (msg.photo && msg.photo.length) fileId = msg.photo[msg.photo.length - 1].file_id;\n\nconst help = 'Send the BACKGROUND image as a FILE (not a compressed photo) with a caption:\\n\\n' +\n  'Single:  Lamine Yamal | I have been at the level to *win Ballon d\\'Or* for a longer time\\n' +\n  'Circle left:  L: Author | quote with *yellow words*  (then send the circle image)\\n' +\n  'Circle right: R: Author | quote with *yellow words*  (then send the circle image)\\n\\n' +\n  'Crop (optional): [c:50,25,1.3] circle, [b:50,40,1] background = x%,y%,zoom\\n' +\n  'Optional Instagram caption after ||  e.g.  Author | quote || 🚨 My caption #football';\nconst out = (o) => [{ json: { chat_id, ready: false, ...o } }];\n\nfunction parseText(t) {\n  const pos = { b: [50, 50, 1], c: [50, 30, 1] };\n  t = t.replace(/\\[\\s*([bcBC])\\s*:\\s*([\\d.]+)\\s*,\\s*([\\d.]+)\\s*(?:,\\s*([\\d.]+))?\\s*\\]/g, (m, k, x, y, z) => { pos[k.toLowerCase()] = [+x, +y, +(z || 1)]; return ''; });\n  let layout = 'single';\n  const m = t.match(/^\\s*([LRSlrs])\\s*:\\s*([\\s\\S]+)$/);\n  if (m) { layout = { l: 'left', r: 'right', s: 'single' }[m[1].toLowerCase()]; t = m[2]; }\n  let caption = '';\n  const ci = t.indexOf('||');\n  if (ci >= 0) { caption = t.slice(ci + 2).trim(); t = t.slice(0, ci); }\n  let author = '', quote = t.trim();\n  const pi = t.indexOf('|');\n  if (pi >= 0) { author = t.slice(0, pi).trim(); quote = t.slice(pi + 1).trim(); }\n  return { layout, author, quote, caption, pos };\n}\nconst jobItems = (job, bgId, circleId) => {\n  const base = { chat_id, ready: true, ...job };\n  const items = [{ json: { ...base, role: 'bg', file_id: bgId } }];\n  if (job.layout !== 'single' && circleId) items.push({ json: { ...base, role: 'circle', file_id: circleId } });\n  return items;\n};\n\nif (!fileId) return out({ reply: help });\n\nif (raw) {\n  const job = parseText(raw);\n  if (job.layout === 'single') { delete sd.pending[chat_id]; return jobItems(job, fileId, null); }\n  sd.pending[chat_id] = { job, bg_file_id: fileId };\n  return out({ reply: 'Got the background. Now send the CIRCLE image (as a file, no caption).' });\n}\nconst p = sd.pending[chat_id];\nif (!p) return out({ reply: help });\ndelete sd.pending[chat_id];\nreturn jobItems(p.job, p.bg_file_id, fileId);\n"
+      },
+      "id": "e2b63b1d-d932-4b22-971a-0434b989cb3d",
+      "name": "Parse Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.ready }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c6fadffd-6fcc-44f8-bdf4-34ca27eb09ad",
+      "name": "Ready?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -640,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.reply }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1bc5b8ea-90e8-4b13-8c97-1e40574ceec7",
+      "name": "Send Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        192
+      ],
+      "webhookId": "6e25b4df-1fa6-4eac-82a7-cc6adb0acf5b",
+      "credentials": {
+        "telegramApi": {
+          "id": "ojZSiFZeJCIVnD6O",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.file_id }}",
+        "additionalFields": {}
+      },
+      "id": "b2b20a6c-4a86-47d0-b7f1-80afef109c4f",
+      "name": "Get File",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -400,
+        -80
+      ],
+      "webhookId": "83ba4a03-cbe2-4ae7-90bb-9532f0017310",
+      "credentials": {
+        "telegramApi": {
+          "id": "ojZSiFZeJCIVnD6O",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const meta = $('Parse Message').first().json;\nconst items = $input.all();\nconst sniff = (b) => (b[0] === 0x89 && b[1] === 0x50) ? 'image/png' : (b[0] === 0x52 && b[1] === 0x49) ? 'image/webp' : 'image/jpeg';\nconst uri = async (i) => {\n  const b = await this.helpers.getBinaryDataBuffer(i, 'data');\n  return 'data:' + sniff(b) + ';base64,' + b.toString('base64');\n};\nconst bg = await uri(0);\nconst circle = (meta.layout !== 'single' && items[1]) ? await uri(1) : null;\nconst esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst parts = String(meta.quote || '').split('*');\nconst quoteHtml = parts.map((p, i) => i % 2 ? '<span class=\"y\">' + esc(p) + '</span>' : esc(p)).join('');\nconst side = meta.layout === 'left' ? 'left:40px' : 'left:540px';\nconst circleHtml = circle ? '<div class=\"circle\" style=\"' + side + '\"><img id=\"ci\" src=\"' + circle + '\"></div>' : '';\n\nconst html = `<!doctype html><html><head><meta charset=\"utf-8\">\n<link href=\"https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@800&display=block\" rel=\"stylesheet\">\n<style>\n*{margin:0;padding:0;box-sizing:border-box}\nhtml,body{width:2160px;height:2700px;overflow:hidden;background:#080a10}\n.post{width:1080px;height:1350px;transform:scale(2);transform-origin:0 0;position:relative;overflow:hidden;background:#080a10}\n.bg{position:absolute;left:0;top:0;max-width:none}\n.shade{position:absolute;left:0;right:0;bottom:0;height:750px;background:linear-gradient(to bottom,rgba(8,10,16,0),rgba(8,10,16,.92) 60%,#080a10)}\n.circle{position:absolute;top:110px;width:500px;height:500px;border-radius:50%;border:8px solid #fff;overflow:hidden;background:#222}\n.circle img{position:absolute;left:0;top:0;max-width:none}\n.bottom{position:absolute;left:70px;right:70px;bottom:50px;display:flex;flex-direction:column;align-items:center}\n.rule{display:flex;align-items:center;width:100%;padding:0 230px;margin-bottom:30px}\n.rule i{flex:1;height:2px;background:rgba(255,255,255,.7)}\n.rule b{display:flex;gap:8px;margin:0 10px}\n.rule b span{display:block;width:22px;height:16px;background:#fff;transform:skewX(-25deg)}\n#q{font-family:Anton,Impact,'Arial Narrow',sans-serif;font-size:96px;line-height:1.06;text-align:center;color:#fff;text-transform:uppercase;text-wrap:balance;width:100%}\n.y{color:#f4ff3a}\n#a{margin-top:32px;width:100%;text-align:center;white-space:nowrap;font:800 34px Montserrat,Arial,sans-serif;letter-spacing:4px;color:#fff;text-transform:uppercase}\n</style></head><body><div class=\"post\">\n<img class=\"bg\" id=\"bgi\" src=\"${bg}\">\n<div class=\"shade\"></div>\n${circleHtml}\n<div class=\"bottom\">\n<div class=\"rule\"><i></i><b><span></span><span></span><span></span><span></span></b><i></i></div>\n<div id=\"q\">${quoteHtml}</div>\n<div id=\"a\">${esc(meta.author)}</div>\n</div></div>\n<script>\nvar P=${JSON.stringify(meta.pos || {})};\nfunction place(img,box,p){\n  var cw=box.clientWidth,ch=box.clientHeight,fx=(p[0]==null?50:p[0])/100,fy=(p[1]==null?50:p[1])/100,z=p[2]||1;\n  var s=Math.max(cw/img.naturalWidth,ch/img.naturalHeight)*z,dw=img.naturalWidth*s,dh=img.naturalHeight*s;\n  img.style.width=dw+'px';img.style.height=dh+'px';\n  img.style.left=Math.min(0,Math.max(cw-dw,cw/2-fx*dw))+'px';\n  img.style.top=Math.min(0,Math.max(ch-dh,ch/2-fy*dh))+'px';\n}\nfunction ready(i){return i&&i.decode?i.decode().catch(function(){}):Promise.resolve();}\nfunction fit(){\n  var q=document.getElementById('q'),a=document.getElementById('a'),fs=96;\n  q.style.fontSize=fs+'px';\n  function lines(){return Math.round(q.offsetHeight/(fs*1.06));}\n  while(fs>40&&(lines()>3||(lines()===3&&fs>82)||q.scrollWidth>q.clientWidth)){fs-=2;q.style.fontSize=fs+'px';}\n  var as=34;\n  while(as>16&&a.scrollWidth>a.clientWidth){as-=1;a.style.fontSize=as+'px';}\n}\nvar bgi=document.getElementById('bgi'),ci=document.getElementById('ci');\nPromise.all([ready(bgi),ready(ci)]).then(function(){\n  place(bgi,document.querySelector('.post'),P.b||[50,50,1]);\n  if(ci)place(ci,ci.parentNode,P.c||[50,30,1]);\n}).then(function(){return document.fonts.load('130px Anton');})\n.then(function(){return document.fonts.load('800 34px Montserrat');}).then(fit,fit);\n</script></body></html>`;\n\nconst bin = await this.helpers.prepareBinaryData(Buffer.from(html, 'utf8'), 'index.html', 'text/html');\nreturn [{ json: { chat_id: meta.chat_id }, binary: { data: bin } }];\n"
+      },
+      "id": "55fcd705-a55c-4677-bc4e-43e3b6e36de2",
+      "name": "Build HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/forms/chromium/screenshot/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "width",
+              "value": "2160"
+            },
+            {
+              "name": "height",
+              "value": "2700"
+            },
+            {
+              "name": "format",
+              "value": "png"
+            },
+            {
+              "name": "waitDelay",
+              "value": "3s"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "cb840258-7723-45d3-95fd-324996fdeb18",
+      "name": "Gotenberg Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        48,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nitems[0].binary.data.fileName = 'news-post.png';\nitems[0].binary.data.mimeType = 'image/png';\nitems[0].binary.data.fileExtension = 'png';\nreturn items;\n"
+      },
+      "id": "fd6c30c3-e14b-4178-8284-66c0e75284f0",
+      "name": "Name File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{ $('Parse Message').first().json.chat_id }}",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "={{ ($('Parse Message').first().json.caption || '').slice(0, 1000) }}"
+        }
+      },
+      "id": "0d64c06d-15d1-40c3-80db-203203f2e6cd",
+      "name": "Send Document",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        496,
+        -80
+      ],
+      "webhookId": "45134f6d-421f-489c-b631-3f073af8da49",
+      "credentials": {
+        "telegramApi": {
+          "id": "ojZSiFZeJCIVnD6O",
+          "name": "Telegram account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Ready?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready?": {
+      "main": [
+        [
+          {
+            "node": "Get File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File": {
+      "main": [
+        [
+          {
+            "node": "Build HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build HTML": {
+      "main": [
+        [
+          {
+            "node": "Gotenberg Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gotenberg Render": {
+      "main": [
+        [
+          {
+            "node": "Name File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name File": {
+      "main": [
+        [
+          {
+            "node": "Send Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "092208d1-5344-4915-9695-7c5c1e9e480e",
+  "nodeGroups": [],
+  "id": "T53ehsPBWfgQgweR",
+  "tags": []
+}

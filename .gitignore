@@ -1,0 +1,10 @@
+# secrets and local files - never commit these
+.env
+*.env
+.n8n/
+config
+*.local
+*.log
+node_modules/
+# ngrok / personal start scripts
+scripts/start-all.bat

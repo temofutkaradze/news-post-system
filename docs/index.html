@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Crop picker</title>
+<style>:root{--bg:#f4f4f4;--fg:#111}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111;--fg:#eee}}:root[data-theme="dark"]{--bg:#111;--fg:#eee}
+body{font-family:Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.row{display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;align-items:flex-start}
+#src{position:relative;cursor:crosshair;line-height:0}#im{max-width:100%;max-height:60vh}#src{max-width:100%}
+#dot{position:absolute;width:16px;height:16px;margin:-8px;border:3px solid #f4ff3a;border-radius:50%;pointer-events:none}
+#pv{position:relative;overflow:hidden;border:4px solid #fff;background:#222}#pv img{position:absolute;max-width:none}
+input,select,button{font-size:16px;padding:8px;margin:2px 0}#out{width:180px}button{background:#f4ff3a;border:0;font-weight:bold;cursor:pointer}</style></head><body>
+<input type="file" id="f" accept="image/*"> <select id="t"><option value="c">Circle</option><option value="b">Background</option></select>
+zoom <input type="range" id="z" min="1" max="4" step="0.05" value="1"><br><br>
+<input id="out" readonly> <button id="cp">Copy tag</button> <br><small>tap the photo where the circle should be centered</small>
+<div class="row"><div id="src"><img id="im"><div id="dot"></div></div><div id="pv"><img id="pi"></div></div>
+<script>
+var $=function(i){return document.getElementById(i)},fx=.5,fy=.3;
+$('f').onchange=function(e){var r=new FileReader();r.onload=function(){$('im').src=r.result;$('pi').src=r.result;$('im').onload=draw};r.readAsDataURL(e.target.files[0])};
+$('im').onclick=function(e){var r=$('im').getBoundingClientRect();fx=(e.clientX-r.left)/r.width;fy=(e.clientY-r.top)/r.height;draw()};
+$('t').onchange=$('z').oninput=draw;
+function draw(){var im=$('im'),pi=$('pi'),pv=$('pv'),c=$('t').value==='c',z=+$('z').value;
+ var W=c?300:240,H=c?300:300;pv.style.width=W+'px';pv.style.height=H+'px';pv.style.borderRadius=c?'50%':'0';
+ var cw=W,ch=H;if(!pi.naturalWidth)return;
+ var s=Math.max(cw/pi.naturalWidth,ch/pi.naturalHeight)*z,dw=pi.naturalWidth*s,dh=pi.naturalHeight*s;
+ pi.style.width=dw+'px';pi.style.height=dh+'px';
+ pi.style.left=Math.min(0,Math.max(cw-dw,cw/2-fx*dw))+'px';pi.style.top=Math.min(0,Math.max(ch-dh,ch/2-fy*dh))+'px';
+ $('dot').style.left=fx*im.width+'px';$('dot').style.top=fy*im.height+'px';
+ $('out').value='['+$('t').value+':'+Math.round(fx*100)+','+Math.round(fy*100)+','+z.toFixed(2)+']';}
+$('cp').onclick=function(){var o=$('out');o.select();o.setSelectionRange(0,99);try{navigator.clipboard.writeText(o.value)}catch(e){}try{document.execCommand('copy')}catch(e){}$('cp').textContent='Copied';setTimeout(function(){$('cp').textContent='Copy tag'},1200)};
+</script></body></html>
