@@ -2,32 +2,85 @@
 <style>:root{--bg:#f4f4f4;--fg:#111}@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111;--fg:#eee}}:root[data-theme="dark"]{--bg:#111;--fg:#eee}
 body{font-family:Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
 .row{display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;align-items:flex-start}
-#src{position:relative;cursor:crosshair;line-height:0;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}#im{-webkit-user-drag:none}#im{max-width:100%;max-height:60vh}#src{max-width:100%}
+.box small{display:block;margin-bottom:4px;opacity:.7}
+#src{position:relative;cursor:crosshair;line-height:0;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;max-width:100%}
+#im{max-width:100%;max-height:60vh;-webkit-user-drag:none}
 #dot{position:absolute;width:22px;height:22px;margin:-14px;border:3px solid #f4ff3a;border-radius:50%;pointer-events:none;box-shadow:0 0 0 2px #000,inset 0 0 0 2px #000}
-#pv{position:relative;overflow:hidden;border:4px solid #fff;background:#222}#pv img{position:absolute;max-width:none}
-input,select,button{font-size:16px;padding:8px;margin:2px 0}#out{width:180px}button{background:#f4ff3a;border:0;font-weight:bold;cursor:pointer}</style></head><body>
-<input type="file" id="f" accept="image/*"> <select id="t"><option value="c">Circle</option><option value="b">Background</option></select>
-zoom <input type="range" id="z" min="1" max="4" step="0.05" value="1"><br><br>
-<input id="out" readonly> <button id="cp">Copy tag</button> <br><small>tap or drag on the photo to move the circle</small>
-<div class="row"><div id="src"><img id="im"><div id="dot"></div></div><div id="pv"><img id="pi"></div></div>
+#pv{position:relative;overflow:hidden;border:4px solid #fff;background:#222;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
+#pv img,#post img{position:absolute;max-width:none;pointer-events:none;-webkit-user-drag:none}
+#post{position:relative;overflow:hidden;width:260px;max-width:100%;aspect-ratio:4/5;background:#222;touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;border:1px solid #888;box-sizing:content-box}
+#cir{position:absolute;overflow:hidden;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 3px #fff;background:#444;pointer-events:none}
+input,select,button{font-size:16px;padding:8px;margin:2px 0}#out{width:260px}button{background:#f4ff3a;border:0;font-weight:bold;cursor:pointer}
+label{white-space:nowrap}</style></head><body>
+<input type="file" id="f" accept="image/*"> <select id="t"><option value="c">Circle</option><option value="b">Background</option></select><br>
+<label>zoom <input type="range" id="z" min="1" max="4" step="0.05" value="1"></label>
+<label id="szw">circle size <input type="range" id="sz" min="15" max="80" step="1" value="40"></label><br><br>
+<input id="out" readonly> <button id="cp">Copy tag</button><br>
+<small>1) Circle / Background: upload a photo for each. 2) Tap or drag on the photo to pick the center. 3) Drag or pinch inside the circle preview to move/zoom. 4) Tap or drag on the post preview to place the circle.</small>
+<div class="row">
+ <div class="box"><small>photo</small><div id="src"><img id="im"><div id="dot"></div></div></div>
+ <div class="box"><small>crop (drag / pinch / wheel)</small><div id="pv"><img id="pi"></div></div>
+ <div class="box"><small>post (place the circle)</small><div id="post"><img id="bgi"><div id="cir"><img id="ci"></div></div></div>
+</div>
 <script>
-var $=function(i){return document.getElementById(i)},fx=.5,fy=.3;
-$('f').onchange=function(e){var r=new FileReader();r.onload=function(){$('im').src=r.result;$('pi').src=r.result;$('im').onload=draw};r.readAsDataURL(e.target.files[0])};
-var drag=false;
-function setPos(e){var r=$('im').getBoundingClientRect();
- fx=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
- fy=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));draw()}
-$('src').addEventListener('pointerdown',function(e){drag=true;try{$('src').setPointerCapture(e.pointerId)}catch(_){}setPos(e);e.preventDefault()});
-$('src').addEventListener('pointermove',function(e){if(drag){setPos(e);e.preventDefault()}});
-['pointerup','pointercancel'].forEach(function(t){$('src').addEventListener(t,function(){drag=false})});
-$('t').onchange=$('z').oninput=draw;
-function draw(){var im=$('im'),pi=$('pi'),pv=$('pv'),c=$('t').value==='c',z=+$('z').value;
- var W=c?300:240,H=c?300:300;pv.style.width=W+'px';pv.style.height=H+'px';pv.style.borderRadius=c?'50%':'0';
- var cw=W,ch=H;if(!pi.naturalWidth)return;
- var s=Math.max(cw/pi.naturalWidth,ch/pi.naturalHeight)*z,dw=pi.naturalWidth*s,dh=pi.naturalHeight*s;
- pi.style.width=dw+'px';pi.style.height=dh+'px';
- pi.style.left=Math.min(0,Math.max(cw-dw,cw/2-fx*dw))+'px';pi.style.top=Math.min(0,Math.max(ch-dh,ch/2-fy*dh))+'px';
- $('dot').style.left=fx*im.width+'px';$('dot').style.top=fy*im.height+'px';
- $('out').value='['+$('t').value+':'+Math.round(fx*100)+','+Math.round(fy*100)+','+z.toFixed(2)+']';}
+var $=function(i){return document.getElementById(i)};
+var S={c:{fx:.5,fy:.3,z:1,sz:40,px:30,py:22,src:''},b:{fx:.5,fy:.5,z:1,src:''}};
+function T(){return S[$('t').value]}
+function cl(v,a,b){return Math.min(b,Math.max(a,v))}
+function ss(el,src){if(src){if(el.getAttribute('src')!==src)el.src=src}else if(el.getAttribute('src')){el.removeAttribute('src')}}
+function fit(img,W,H,f){if(!img.naturalWidth)return;
+ var s=Math.max(W/img.naturalWidth,H/img.naturalHeight)*f.z,dw=img.naturalWidth*s,dh=img.naturalHeight*s;
+ img.style.width=dw+'px';img.style.height=dh+'px';
+ img.style.left=Math.min(0,Math.max(W-dw,W/2-f.fx*dw))+'px';img.style.top=Math.min(0,Math.max(H-dh,H/2-f.fy*dh))+'px'}
+['im','pi','ci','bgi'].forEach(function(i){$(i).onload=draw});
+
+$('f').onchange=function(e){var file=e.target.files[0];if(!file)return;T().src=URL.createObjectURL(file);draw()};
+$('t').onchange=draw;
+$('z').oninput=function(){T().z=+$('z').value;draw()};
+$('sz').oninput=function(){S.c.sz=+$('sz').value;draw()};
+
+/* 1) tap/drag on the source photo -> center point */
+var dragSrc=false;
+function setPos(e){var r=$('im').getBoundingClientRect(),f=T();
+ f.fx=cl((e.clientX-r.left)/r.width,0,1);f.fy=cl((e.clientY-r.top)/r.height,0,1);draw()}
+$('src').addEventListener('pointerdown',function(e){dragSrc=true;try{$('src').setPointerCapture(e.pointerId)}catch(_){}setPos(e);e.preventDefault()});
+$('src').addEventListener('pointermove',function(e){if(dragSrc){setPos(e);e.preventDefault()}});
+['pointerup','pointercancel'].forEach(function(t){$('src').addEventListener(t,function(){dragSrc=false})});
+
+/* 2) inside the crop preview: drag = move photo, pinch / wheel = zoom */
+var ptr={},p0=1,z0=1;
+function dist(){var k=Object.keys(ptr);if(k.length<2)return 1;var a=ptr[k[0]],b=ptr[k[1]];return Math.hypot(a.x-b.x,a.y-b.y)||1}
+$('pv').addEventListener('pointerdown',function(e){try{$('pv').setPointerCapture(e.pointerId)}catch(_){}
+ ptr[e.pointerId]={x:e.clientX,y:e.clientY};if(Object.keys(ptr).length===2){p0=dist();z0=T().z}e.preventDefault()});
+$('pv').addEventListener('pointermove',function(e){var o=ptr[e.pointerId];if(!o)return;var f=T(),n=Object.keys(ptr).length;
+ var dx=e.clientX-o.x,dy=e.clientY-o.y;ptr[e.pointerId]={x:e.clientX,y:e.clientY};
+ if(n===1){var dw=parseFloat($('pi').style.width)||1,dh=parseFloat($('pi').style.height)||1;f.fx=cl(f.fx-dx/dw,0,1);f.fy=cl(f.fy-dy/dh,0,1)}
+ else if(n===2){f.z=cl(z0*dist()/p0,1,4)}
+ draw();e.preventDefault()});
+['pointerup','pointercancel'].forEach(function(t){$('pv').addEventListener(t,function(e){delete ptr[e.pointerId]})});
+$('pv').addEventListener('wheel',function(e){e.preventDefault();var f=T();f.z=cl(f.z*Math.exp(-e.deltaY*.002),1,4);draw()},{passive:false});
+
+/* 3) tap/drag on the post preview -> circle position */
+var dragPost=false;
+function setPost(e){var r=$('post').getBoundingClientRect();
+ S.c.px=cl((e.clientX-r.left)/r.width*100,0,100);S.c.py=cl((e.clientY-r.top)/r.height*100,0,100);draw()}
+$('post').addEventListener('pointerdown',function(e){dragPost=true;try{$('post').setPointerCapture(e.pointerId)}catch(_){}setPost(e);e.preventDefault()});
+$('post').addEventListener('pointermove',function(e){if(dragPost){setPost(e);e.preventDefault()}});
+['pointerup','pointercancel'].forEach(function(t){$('post').addEventListener(t,function(){dragPost=false})});
+
+function draw(){var t=$('t').value,f=S[t],c=t==='c',pv=$('pv'),im=$('im');
+ $('z').value=f.z;$('sz').value=S.c.sz;$('szw').style.display=c?'':'none';
+ ss(im,f.src);ss($('pi'),f.src);ss($('ci'),S.c.src);ss($('bgi'),S.b.src);
+ var W=c?300:240,H=300;pv.style.width=W+'px';pv.style.height=H+'px';pv.style.borderRadius=c?'50%':'0';
+ fit($('pi'),W,H,f);
+ $('dot').style.left=f.fx*im.width+'px';$('dot').style.top=f.fy*im.height+'px';
+ var P=$('post'),pw=P.clientWidth,ph=P.clientHeight,d=S.c.sz/100*pw;
+ fit($('bgi'),pw,ph,S.b);
+ var ci=$('cir');ci.style.width=ci.style.height=d+'px';ci.style.left=S.c.px/100*pw+'px';ci.style.top=S.c.py/100*ph+'px';
+ fit($('ci'),d,d,S.c);
+ $('out').value=c?'[c:'+Math.round(f.fx*100)+','+Math.round(f.fy*100)+','+f.z.toFixed(2)+','+Math.round(S.c.sz)+','+Math.round(S.c.px)+','+Math.round(S.c.py)+']'
+                 :'[b:'+Math.round(f.fx*100)+','+Math.round(f.fy*100)+','+f.z.toFixed(2)+']'}
+window.addEventListener('resize',draw);draw();
+
 $('cp').onclick=function(){var o=$('out');o.select();o.setSelectionRange(0,99);try{navigator.clipboard.writeText(o.value)}catch(e){}try{document.execCommand('copy')}catch(e){}$('cp').textContent='Copied';setTimeout(function(){$('cp').textContent='Copy tag'},1200)};
 </script></body></html>
