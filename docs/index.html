@@ -44,7 +44,7 @@ function fit(img,W,H,f){if(!img.naturalWidth||!W)return;
  img.style.left=Math.min(0,Math.max(W-dw,W/2-f.fx*dw))+'px';img.style.top=Math.min(0,Math.max(H-dh,H/2-f.fy*dh))+'px'}
 ['bgi','ci','cuti'].forEach(function(i){$(i).onload=draw});
 
-/* ---- loading photos ---- */
+/* ---- Loading photos ---- */
 function toSrc(file){return new Promise(function(ok,no){
  function tryUrl(u,fail){var im=new Image();im.onload=function(){ok({src:u,w:im.naturalWidth,h:im.naturalHeight})};im.onerror=fail;im.src=u}
  var u;try{u=URL.createObjectURL(file)}catch(e){u=''}
