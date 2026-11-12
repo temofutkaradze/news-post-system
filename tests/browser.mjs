@@ -32,15 +32,22 @@ try{
   for(const viewport of [{width:1280,height:950},{width:1366,height:768},{width:1024,height:600}]){
     await page.setViewportSize(viewport);
     const before=await page.locator('#poster').boundingBox(),toolbar=await page.locator('#modes').boundingBox();
-    assert.ok(toolbar.y+toolbar.height<=before.y);assert.ok(before.y>=0&&before.y+before.height<=viewport.height);
+    assert.ok(toolbar.y+toolbar.height<=before.y);
+    const availableWidth=await page.locator('.workspace').evaluate(el=>el.clientWidth);
+    assert.ok(before.width>=Math.min(520,availableWidth)-1,'Preview must use the previous width-based size, even on short screens');
     assert.ok(Math.abs(before.width/before.height-.8)<.002);
     await page.locator('.inspector').evaluate(el=>el.scrollTop=el.scrollHeight);
     const after=await page.locator('#poster').boundingBox();assert.deepEqual(after,before);
     const scrolling=await page.evaluate(()=>({panel:document.querySelector('.inspector').scrollTop,page:scrollY,overflow:document.documentElement.scrollWidth>innerWidth}));
     assert.ok(scrolling.panel>0);assert.equal(scrolling.page,0);assert.equal(scrolling.overflow,false);
+    const panelScroll=scrolling.panel;
+    await page.locator('.workspace').evaluate(el=>el.scrollTop=el.scrollHeight);
+    assert.ok(await page.locator('.workspace').evaluate(el=>el.scrollTop>0),'Large preview may scroll instead of shrinking');
+    assert.equal(await page.locator('.inspector').evaluate(el=>el.scrollTop),panelScroll);
+    await page.locator('.workspace').evaluate(el=>el.scrollTop=0);
     await page.locator('.inspector').evaluate(el=>el.scrollTop=0);
   }
-  check('Desktop toolbar above photo; settings scroll independently with full stationary preview at three viewport sizes');
+  check('Desktop preview retains width-based size and 4:5 ratio; left/right columns scroll independently at three viewport sizes');
   await page.setViewportSize({width:1280,height:950});
   await page.locator('#background-file').setInputFiles(path.join(root,'tests/fixtures/orientation-6.jpg'));
   await page.waitForFunction(()=>document.querySelector('#background-info').textContent.includes('40 × 80'));
