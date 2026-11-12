@@ -5,7 +5,7 @@ let nextId=0;
 export function createCircle(){const number=++nextId;return {...photoSlot(),id:`circle-${number}`,label:`Circle ${number}`,focal:{x:.5,y:.3,zoom:1},layout:{x:30,y:22,size:40,border:7},pop:false,smart:false,popHeight:50};}
 export function createState(){
   const first=createCircle();
-  const state={editorial:{template:'none',headline:'',subtitle:''},background:photoSlot(),circles:[first],activeId:first.id,selectedIds:new Set([first.id])};
+  const state={background:photoSlot(),circles:[first],activeId:first.id,selectedIds:new Set([first.id])};
   // A single inspector edits the active circle, never all circles implicitly.
   Object.defineProperty(state,'circle',{get:()=>state.circles.find(c=>c.id===state.activeId)||state.circles[0]});
   for(const key of ['layout','pop','smart','popHeight'])Object.defineProperty(state,key,{get:()=>state.circle[key],set:value=>state.circle[key]=value});

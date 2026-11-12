@@ -1,15 +1,13 @@
 // News Post Studio — Copyright (C) 2026 temofutkaradze
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { WIDTH, HEIGHT, clamp, fit, cropTags, circleRect } from './geometry.js';
-import { loadImage, disposeSource, inferenceInput, save } from './images.js?v=editorial-templates-1';
+import { loadImage, disposeSource, inferenceInput, save } from './images.js?v=multi-circle-1';
 import { maskFromImage } from './masks.js';
-import { Renderer, exportPoster, exportCutout } from './render.js?v=editorial-templates-1';
+import { Renderer, exportPoster, exportCutout } from './render.js?v=multi-circle-1';
 import { Segmenter } from './segmentation.js';
 import { MaskEditor } from './mask-editor.js';
-import { createState, addCircle, selectCircle, removeCircle, reorderCircle, bulkEffect, hitCircle, projectEstimate, projectBudget } from './state.js?v=editorial-templates-1';
+import { createState, addCircle, selectCircle, removeCircle, reorderCircle, bulkEffect, hitCircle, projectEstimate, projectBudget } from './state.js';
 import { CircleList } from './circle-list.js';
-
-import { readyTemplateFont } from './templates.js';
 
 const $=id=>document.getElementById(id);
 export const state=createState();
@@ -146,14 +144,6 @@ async function copy(text){
   try{await navigator.clipboard.writeText(text);status('Crop coordinates copied.');}
   catch{status('Clipboard unavailable. Select and copy the crop coordinates below.');}
 }
-function syncTemplate(){
-  $('editorial-fields').hidden=state.editorial.template==='none';
-  $('subtitle-field').hidden=state.editorial.template!=='headline-subtitle';
-}
-$('template').onchange=()=>{state.editorial.template=$('template').value;syncTemplate();draw();};
-for(const field of ['headline','subtitle'])$(field).oninput=()=>{state.editorial[field]=$(field).value;draw();};
-readyTemplateFont().then(draw).catch(()=>status('Headline font could not load. Reload before exporting a text template.',true));
-syncTemplate();
 for(const key of ['background','circle'])$(key+'-file').onchange=e=>{replacePhoto(key,e.target.files[0]);e.target.value='';};
 $('remove-circle').onclick=()=>{cancel();const removed=removeCircle(state,state.activeId);disposeSource(removed.source);removed.mask?.dispose();sync();draw();};
 $('add-circle').onclick=()=>{const empty=state.circles.find(c=>!c.source&&!c.pendingSource);if(empty)selectCircle(state,empty.id);else addCircle(state);setMode('layout');sync();draw();$('circle-file').click();};

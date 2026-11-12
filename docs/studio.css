@@ -28,7 +28,3 @@
 #circle-list.single .circle-select{display:none}
 #bulk-actions{border-top:1px solid var(--line);margin-top:10px;padding-top:6px}
 #bulk-actions[hidden]{display:none}
-@font-face{font-family:"Studio Anton";src:url("./fonts/Anton-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
-.editorial-field{display:block;margin-top:16px}
-.editorial-field textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;min-height:80px;margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--surface2,#10151b);color:var(--text,#fff);font:inherit;line-height:1.5}
-#editorial-fields[hidden],#subtitle-field[hidden]{display:none}
