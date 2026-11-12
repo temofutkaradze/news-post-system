@@ -3,17 +3,17 @@
 /* Preview modes stay above the photograph on every screen size. */
 .preview-toolbar{margin:0 0 12px}
 
-/* Desktop: one viewport-sized workspace, with only the inspector scrolling. */
+/* Desktop: independently scrolling columns; size the photo by width, not leftover height. */
 @media(min-width:1000px){
   html,body{height:100%;overflow:hidden}
   body{height:100dvh;display:grid;grid-template-rows:90px minmax(0,1fr) auto}
   .topbar{height:auto;min-height:0}
   .studio{width:100%;height:100%;min-height:0;padding-top:20px;padding-bottom:20px;align-items:stretch}
-  .workspace{position:static;height:100%;min-height:0;display:flex;flex-direction:column}
+  .workspace{position:static;height:100%;min-height:0;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
   .workspace-heading{flex-shrink:0;margin-bottom:12px}
   .preview-toolbar{flex-shrink:0}
-  .preview-stage{flex:1 1 0;min-height:0;container-type:size;display:grid;place-items:center}
-  .preview-shell{width:min(100cqw,80cqh);height:auto;max-width:520px;aspect-ratio:4/5}
+  .preview-stage{flex:none;display:grid;place-items:center}
+  .preview-shell{width:100%;height:auto;max-width:520px;aspect-ratio:4/5}
   .workspace>.hint,.workspace>.status,.workspace>#cancel{flex-shrink:0}
   .inspector{height:100%;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable;padding-right:6px}
   .inspector>.panel{flex-shrink:0}
