@@ -2,6 +2,7 @@
 import { WIDTH, HEIGHT, fit, circleRect } from './geometry.js';
 import { canvas, releaseCanvas, toBlob } from './images.js';
 import { missingMasks } from './state.js';
+import { renderTemplate, readyTemplateFont } from './templates.js';
 const image=(g,bitmap,r)=>g.drawImage(bitmap,r.x,r.y,r.w,r.h);
 
 /** One geometry and layer order for preview and both export sizes. Original RGB only. */
@@ -34,11 +35,13 @@ export class Renderer {
       }
       g.drawImage(this.layer,0,0,WIDTH,HEIGHT);
     }
+    if(!plain)renderTemplate(g,state.editorial);
   }
   dispose(){releaseCanvas(this.layer);releaseCanvas(this.cut);}
 }
 export async function exportPoster(state,{scale=1,type='image/png'}={}){
   const missing=missingMasks(state);if(missing.length)throw Error(`Create or import masks for ${missing.join(', ')}, or disable those effects before exporting.`);
+  if(state.editorial?.template&&state.editorial.template!=='none')await readyTemplateFont();
   const out=canvas(WIDTH*scale,HEIGHT*scale),renderer=new Renderer();
   try{renderer.render(out,state,{scale});return await toBlob(out,type,.96);}
   finally{renderer.dispose();releaseCanvas(out);}

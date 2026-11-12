@@ -4,6 +4,22 @@ import { fit, circleRect, cropTags } from '../docs/js/geometry.js';
 import { dimensions } from '../docs/js/images.js';
 import { Mask, brush, keepConnected, validateMetadata } from '../docs/js/masks.js';
 import { createState, addCircle, selectCircle, removeCircle, reorderCircle, bulkEffect, hitCircle, projectEstimate, projectBudget, missingMasks } from '../docs/js/state.js';
+import { TEMPLATES, markedText, fitText } from '../docs/js/templates.js';
+
+test('four editorial templates preserve the original default and multiline yellow markup',()=>{
+  assert.equal(createState().editorial.template,'none');
+  assert.deepEqual(TEMPLATES,['none','headline-subtitle','large-headline','news-red','did-you-know']);
+  const chars=markedText('The *hands\nand jersey* stay',{uppercase:true});
+  assert.equal(chars.map(c=>c.char).join(''),'THE HANDS\nAND JERSEY STAY');
+  assert.equal(chars.filter(c=>c.yellow).map(c=>c.char).join(''),'HANDS\nAND JERSEY');
+});
+test('editorial text fitting retains long words and explicit lines inside safe bounds',()=>{
+  const g={font:'',measureText(text){return {width:text.length*parseFloat(this.font)*.55};}};
+  const text='EXTRAORDINARILY'.repeat(12)+'\n*YELLOW TEXT*';
+  const block=fitText(g,text,{width:880,height:166,size:60});
+  assert.ok(block.height<=166);assert.ok(block.lines.every(line=>g.measureText(line.map(c=>c.char).join('')).width<=880));
+  assert.equal(block.lines.flat().map(c=>c.char).join('').replace(/\s/g,''),text.replace(/[\s*]/g,''));
+});
 
 test('stable circle identities, independent settings, bulk selection and layer order',()=>{
   const s=createState(),a=s.circle,b=addCircle(s),c=addCircle(s);a.source=b.source=c.source={width:120,height:150};

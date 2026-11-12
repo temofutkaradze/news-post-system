@@ -12,3 +12,7 @@ The complete preferred-form source and deployment instructions are available at 
 - No MODNet weights, runtime or inference code are shipped. Imported externally generated masks are user data. This release makes no new MODNet deployment license claim.
 
 The browser downloads static assets, not cloud inference. Users can operate without that package using mask imports and local correction. Photographs are not sent to a CDN.
+
+## Anton headline font
+
+Self-hosted unmodified `docs/fonts/Anton-Regular.ttf` from [Google Fonts / Anton](https://github.com/google/fonts/tree/main/ofl/anton). Copyright 2020 The Anton Project Authors. SIL Open Font License 1.1; the complete license and copyright notice accompany the font in `docs/fonts/OFL-Anton.txt`. No external font request is needed.
