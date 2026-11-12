@@ -7,6 +7,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { checkMultiCircle } from './multicircle-checks.mjs';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const output=path.join(root,'.test-output');await fs.mkdir(output,{recursive:true});
 const docs=path.join(root,'docs');
@@ -26,11 +27,13 @@ try{
   browser=await chromium.launch({headless:true,args:['--renderer-process-limit=1','--disable-gpu']});
   const page=await browser.newPage({viewport:{width:1280,height:950}});page.setDefaultTimeout(20000);
   const base=process.env.STUDIO_BASE_URL||`http://127.0.0.1:${server.address().port}/`;
-  page.on('pageerror',e=>report.errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))report.externalRequests.push(r.url());});
+  page.on('pageerror',e=>report.errors.push(e.message));page.on('request',r=>{const url=new URL(r.url()),localBlob=url.protocol==='blob:'&&url.origin===new URL(base).origin;if(!r.url().startsWith(base)&&!localBlob)report.externalRequests.push(r.url());});
   await page.goto(base);await page.waitForFunction(()=>document.getElementById('background-tag').value);
+  await page.evaluate(async()=>{window.testState=(await import(document.querySelector('script[type=module]').src)).state;});
   assert.equal(await page.locator('#pop-toggle').isChecked(),false);assert.equal(await page.locator('#smart-toggle').isChecked(),false);check('Both effects default OFF');
   for(const viewport of [{width:1280,height:950},{width:1366,height:768},{width:1024,height:600}]){
     await page.setViewportSize(viewport);
+    await page.evaluate(()=>scrollTo(0,0));
     const before=await page.locator('#poster').boundingBox(),toolbar=await page.locator('#modes').boundingBox();
     assert.ok(toolbar.y+toolbar.height<=before.y);
     const availableWidth=await page.locator('.workspace').evaluate(el=>el.clientWidth);
@@ -42,16 +45,17 @@ try{
     assert.ok(scrolling.panel>0);assert.equal(scrolling.page,0);assert.equal(scrolling.overflow,false);
     const panelScroll=scrolling.panel;
     await page.locator('.workspace').evaluate(el=>el.scrollTop=el.scrollHeight);
-    assert.ok(await page.locator('.workspace').evaluate(el=>el.scrollTop>0),'Large preview may scroll instead of shrinking');
+    assert.equal(await page.locator('.workspace').evaluate(el=>el.scrollTop),0,'Left workspace must not be an internal scrolling panel');
+    await page.evaluate(()=>scrollTo(0,400));assert.ok(await page.evaluate(()=>scrollY>0),'Left content uses document scrolling');
     assert.equal(await page.locator('.inspector').evaluate(el=>el.scrollTop),panelScroll);
-    await page.locator('.workspace').evaluate(el=>el.scrollTop=0);
+    await page.evaluate(()=>scrollTo(0,0));
     await page.locator('.inspector').evaluate(el=>el.scrollTop=0);
   }
-  check('Desktop preview retains width-based size and 4:5 ratio; left/right columns scroll independently at three viewport sizes');
+  check('Large 4:5 preview uses normal document scrolling; only the right inspector scrolls internally');
   await page.setViewportSize({width:1280,height:950});
   await page.locator('#background-file').setInputFiles(path.join(root,'tests/fixtures/orientation-6.jpg'));
   await page.waitForFunction(()=>document.querySelector('#background-info').textContent.includes('40 × 80'));
-  const orientation=await page.evaluate(async()=>{const s=(await import('./js/app.js')).state.background.source,c=document.createElement('canvas');c.width=40;c.height=80;const g=c.getContext('2d');g.drawImage(s.bitmap,0,0);return {top:[...g.getImageData(20,10,1,1).data],bottom:[...g.getImageData(20,70,1,1).data]};});
+  const orientation=await page.evaluate(async()=>{const s=(await import(document.querySelector('script[type=module]').src)).state.background.source,c=document.createElement('canvas');c.width=40;c.height=80;const g=c.getContext('2d');g.drawImage(s.bitmap,0,0);return {top:[...g.getImageData(20,10,1,1).data],bottom:[...g.getImageData(20,70,1,1).data]};});
   assert.ok(orientation.top[0]>200&&orientation.bottom[2]>200);check('EXIF orientation normalizes dimensions and original RGB correctly');
   const fixture=await page.evaluate(async()=>{
     const c=document.createElement('canvas');c.width=120;c.height=150;const g=c.getContext('2d');g.fillStyle='#14678d';g.fillRect(0,0,120,150);g.fillStyle='#fa5d31';g.fillRect(52,5,40,140);return c.toDataURL().split(',')[1];
@@ -64,15 +68,15 @@ try{
     const button=page.locator(`[data-mode="${mode}"]`);await button.focus();await page.keyboard.press('Enter');
     assert.equal(await button.getAttribute('aria-pressed'),'true');assert.ok(await button.evaluate(el=>el.classList.contains('selected')));
     await page.locator('#zoom').evaluate(el=>{el.value=2;el.dispatchEvent(new Event('input',{bubbles:true}));});
-    const old=await page.evaluate(async()=>{const{state}=await import('./js/app.js');return {layout:{...state.layout},circle:{...state.circle.focal},background:{...state.background.focal}};});
+    const old=await page.evaluate(async()=>{const{state}=await import(document.querySelector('script[type=module]').src);return {layout:{...state.layout},circle:{...state.circle.focal},background:{...state.background.focal}};});
     const r=await page.locator('#poster').boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+15,r.y+r.height/2+15,{steps:3});await page.mouse.up();
-    const current=await page.evaluate(async()=>{const{state}=await import('./js/app.js');return {layout:{...state.layout},circle:{...state.circle.focal},background:{...state.background.focal}};});
+    const current=await page.evaluate(async()=>{const{state}=await import(document.querySelector('script[type=module]').src);return {layout:{...state.layout},circle:{...state.circle.focal},background:{...state.background.focal}};});
     assert.notDeepEqual(current[mode],old[mode]);
   }
   await page.click('#reset-layout');check('All three relocated modes retain keyboard activation, highlight, zoom and drag');
   // Synthetic masks test compositor invariants, not segmentation accuracy.
   const pixelChecks=await page.evaluate(async()=>{
-    const {state}=await import('./js/app.js'),{Mask}=await import('./js/masks.js'),{Renderer}=await import('./js/render.js');
+    const {state}=await import(document.querySelector('script[type=module]').src),{Mask}=await import('./js/masks.js'),{Renderer}=await import('./js/render.js');
     const r=new Renderer(),c=document.createElement('canvas'),g=c.getContext('2d');
     const mask=new Mask(120,150);for(let y=0;y<150;y++)for(let x=52;x<92;x++)mask.data[y*120+x]=1;
     state.background.mask=mask;state.circle.mask=new Mask(120,150,mask.data.slice());state.layout.x=50;state.layout.y=30;
@@ -100,26 +104,27 @@ try{
   await page.selectOption('#export-type','image/jpeg');bytes=await download('poster-1080.jpg');assert.equal(bytes.readUInt16BE(0),0xffd8);await page.selectOption('#export-type','image/png');check('Separate high-quality JPEG export');
   await page.click('[data-edit="background"]');await page.click('[data-tool="erase"]');const rect=await page.locator('#mask-editor canvas').boundingBox();await page.mouse.move(rect.x+rect.width*.55,rect.y+rect.height*.5);await page.mouse.down();await page.mouse.move(rect.x+rect.width*.6,rect.y+rect.height*.55,{steps:5});await page.mouse.up();await page.click('[data-undo]');await page.click('#close-editor');check('Manual correction and Undo via actual UI');
   const rejection=await page.evaluate(async()=>{
-    const{state}=await import('./js/app.js'),{validateMetadata}=await import('./js/masks.js');try{validateMetadata({version:1},state.background.source,120,150);return false;}catch{return true;}
+    const{state}=await import(document.querySelector('script[type=module]').src),{validateMetadata}=await import('./js/masks.js');try{validateMetadata({version:1},state.background.source,120,150);return false;}catch{return true;}
   });assert.equal(rejection,true);check('Invalid imported metadata rejected');
   // Delay one real decode: a later selection must win even if the first finishes last.
   await page.evaluate(()=>{const original=createImageBitmap.bind(window);let first=true;window.createImageBitmap=async(...args)=>{if(first){first=false;await new Promise(r=>window.releaseDecode=r);}return original(...args);};window.restoreDecode=()=>window.createImageBitmap=original;});
   await page.locator('#background-file').setInputFiles({...photo,name:'old.png'});
   await page.waitForFunction(()=>!!window.releaseDecode);
   await page.locator('#background-file').setInputFiles({...photo,name:'new.png'});
-  await page.waitForFunction(async()=>{const{state}=await import('./js/app.js');return state.background.source.file.name==='new.png';});
+  await page.waitForFunction(()=>window.testState.background.source.file.name==='new.png');
   await page.evaluate(()=>{window.releaseDecode();window.restoreDecode();});
   await page.waitForTimeout(100);
-  assert.equal(await page.evaluate(async()=>(await import('./js/app.js')).state.background.source.file.name),'new.png');check('Stale photo decode cannot replace the latest upload');
+  assert.equal(await page.evaluate(async()=>(await import(document.querySelector('script[type=module]').src)).state.background.source.file.name),'new.png');check('Stale photo decode cannot replace the latest upload');
   // Deterministic worker protocol fixture: not a claim of model inference/quality.
   await page.route('**/js/segment-worker.js',route=>route.fulfill({contentType:'text/javascript',body:`self.onmessage=({data})=>setTimeout(()=>self.postMessage({kind:'result',blob:data.blob}),400);`}));
   await page.click('#process-background');await page.waitForFunction(()=>!document.querySelector('#cancel').hidden);await page.click('#cancel');
-  assert.equal(await page.evaluate(async()=>(await import('./js/app.js')).state.background.mask),null);check('Cancellation terminates a pending worker and preserves current state');
+  assert.equal(await page.evaluate(async()=>(await import(document.querySelector('script[type=module]').src)).state.background.mask),null);check('Cancellation terminates a pending worker and preserves current state');
   await page.click('#process-background');await page.waitForFunction(()=>!document.querySelector('#cancel').hidden);
   await page.locator('#background-file').setInputFiles({...photo,name:'replacement.png'});
-  await page.waitForFunction(async()=>(await import('./js/app.js')).state.background.source.file.name==='replacement.png');
-  await page.waitForTimeout(500);assert.equal(await page.evaluate(async()=>(await import('./js/app.js')).state.background.mask),null);check('Replacing a photo invalidates pending segmentation');
+  await page.waitForFunction(()=>window.testState.background.source.file.name==='replacement.png');
+  await page.waitForTimeout(500);assert.equal(await page.evaluate(async()=>(await import(document.querySelector('script[type=module]').src)).state.background.mask),null);check('Replacing a photo invalidates pending segmentation');
   await page.unroute('**/js/segment-worker.js');
+  await checkMultiCircle(page,photo,check);
   for(const width of [390,820]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const toolbar=await page.locator('#modes').boundingBox(),photo=await page.locator('#poster').boundingBox();assert.ok(toolbar.y+toolbar.height<=photo.y);await page.evaluate(()=>scrollTo(0,500));assert.ok(await page.evaluate(()=>scrollY>0));await page.evaluate(()=>scrollTo(0,0));}
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'mobile-editor.png'),fullPage:true});check('Mobile and tablet use normal page scrolling with toolbar above the image');
   await page.setViewportSize({width:1280,height:950});
@@ -133,6 +138,18 @@ try{
     await page.locator('#smart-toggle').uncheck();await page.locator('#pop-toggle').check();await download('circle-pop-out.png');
     await page.locator('#smart-toggle').check();await download('both-effects.png');
     const cutDownload=page.waitForEvent('download');await page.click('#download-cutout');await(await cutDownload).saveAs(path.join(output,'transparent-circle.png'));check('Original-RGB transparent cutout and both effects with authorized photograph');
+    await download('one-circle.png');
+    const extras=(process.env.STUDIO_EXTRA_PHOTOS||'').split(';').filter(Boolean);
+    for(let i=0;i<2;i++){
+      const chooser=page.waitForEvent('filechooser');await page.click('#add-circle');await(await chooser).setFiles(extras[i]||process.env.STUDIO_PHOTO);
+      await page.waitForFunction(()=>window.testState.circle.source!==null);
+      await page.evaluate(async index=>{const{state}=await import(document.querySelector('script[type=module]').src);state.layout={x:index?72:25,y:index?66:26,size:30,border:7};},i);
+      await page.locator('#smart-toggle').check();await download(i?'three-circles.png':'two-circles.png');
+    }
+    check('Real one-, two- and three-circle browser exports reuse the approved background mask without additional inference');
+    await page.selectOption('#export-size','2');const multiLarge=await download('three-circles-2160.png');assert.equal(multiLarge.readUInt32BE(16),2160);assert.equal(multiLarge.readUInt32BE(20),2700);
+    await page.selectOption('#export-size','1');await page.selectOption('#export-type','image/jpeg');const multiJpeg=await download('three-circles.jpg');assert.equal(multiJpeg.readUInt16BE(0),0xffd8);await page.selectOption('#export-type','image/png');
+    check('Every circle is included by the shared compositor for 1080/2160 PNG and JPEG exports');
     await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:path.join(output,'desktop-editor.png'),fullPage:false});check('Authorized real photograph and approved MODNet mask: left/right PNG downloads');
   }
   assert.deepEqual(report.errors,[]);assert.deepEqual(report.externalRequests,[]);check('No browser errors or third-party requests during manual/import editing');
