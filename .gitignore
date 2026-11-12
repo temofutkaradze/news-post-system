@@ -8,3 +8,4 @@ config
 node_modules/
 # ngrok / personal start scripts
 scripts/start-all.bat
+.test-output/
