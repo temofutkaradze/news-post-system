@@ -29,6 +29,19 @@ try{
   page.on('pageerror',e=>report.errors.push(e.message));page.on('request',r=>{if(!r.url().startsWith(base))report.externalRequests.push(r.url());});
   await page.goto(base);await page.waitForFunction(()=>document.getElementById('background-tag').value);
   assert.equal(await page.locator('#pop-toggle').isChecked(),false);assert.equal(await page.locator('#smart-toggle').isChecked(),false);check('Both effects default OFF');
+  for(const viewport of [{width:1280,height:950},{width:1366,height:768},{width:1024,height:600}]){
+    await page.setViewportSize(viewport);
+    const before=await page.locator('#poster').boundingBox(),toolbar=await page.locator('#modes').boundingBox();
+    assert.ok(toolbar.y+toolbar.height<=before.y);assert.ok(before.y>=0&&before.y+before.height<=viewport.height);
+    assert.ok(Math.abs(before.width/before.height-.8)<.002);
+    await page.locator('.inspector').evaluate(el=>el.scrollTop=el.scrollHeight);
+    const after=await page.locator('#poster').boundingBox();assert.deepEqual(after,before);
+    const scrolling=await page.evaluate(()=>({panel:document.querySelector('.inspector').scrollTop,page:scrollY,overflow:document.documentElement.scrollWidth>innerWidth}));
+    assert.ok(scrolling.panel>0);assert.equal(scrolling.page,0);assert.equal(scrolling.overflow,false);
+    await page.locator('.inspector').evaluate(el=>el.scrollTop=0);
+  }
+  check('Desktop toolbar above photo; settings scroll independently with full stationary preview at three viewport sizes');
+  await page.setViewportSize({width:1280,height:950});
   await page.locator('#background-file').setInputFiles(path.join(root,'tests/fixtures/orientation-6.jpg'));
   await page.waitForFunction(()=>document.querySelector('#background-info').textContent.includes('40 × 80'));
   const orientation=await page.evaluate(async()=>{const s=(await import('./js/app.js')).state.background.source,c=document.createElement('canvas');c.width=40;c.height=80;const g=c.getContext('2d');g.drawImage(s.bitmap,0,0);return {top:[...g.getImageData(20,10,1,1).data],bottom:[...g.getImageData(20,70,1,1).data]};});
@@ -40,6 +53,16 @@ try{
   await page.locator('#background-file').setInputFiles(photo);await page.waitForFunction(()=>!document.querySelector('#export').disabled);
   await page.locator('#circle-file').setInputFiles(photo);await page.waitForFunction(()=>!document.querySelector('#remove-circle').disabled);
   check('Original uploads and normal circle editing');
+  for(const mode of ['layout','circle','background']){
+    const button=page.locator(`[data-mode="${mode}"]`);await button.focus();await page.keyboard.press('Enter');
+    assert.equal(await button.getAttribute('aria-pressed'),'true');assert.ok(await button.evaluate(el=>el.classList.contains('selected')));
+    await page.locator('#zoom').evaluate(el=>{el.value=2;el.dispatchEvent(new Event('input',{bubbles:true}));});
+    const old=await page.evaluate(async()=>{const{state}=await import('./js/app.js');return {layout:{...state.layout},circle:{...state.circle.focal},background:{...state.background.focal}};});
+    const r=await page.locator('#poster').boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+15,r.y+r.height/2+15,{steps:3});await page.mouse.up();
+    const current=await page.evaluate(async()=>{const{state}=await import('./js/app.js');return {layout:{...state.layout},circle:{...state.circle.focal},background:{...state.background.focal}};});
+    assert.notDeepEqual(current[mode],old[mode]);
+  }
+  await page.click('#reset-layout');check('All three relocated modes retain keyboard activation, highlight, zoom and drag');
   // Synthetic masks test compositor invariants, not segmentation accuracy.
   const pixelChecks=await page.evaluate(async()=>{
     const {state}=await import('./js/app.js'),{Mask}=await import('./js/masks.js'),{Renderer}=await import('./js/render.js');
@@ -90,7 +113,8 @@ try{
   await page.waitForFunction(async()=>(await import('./js/app.js')).state.background.source.file.name==='replacement.png');
   await page.waitForTimeout(500);assert.equal(await page.evaluate(async()=>(await import('./js/app.js')).state.background.mask),null);check('Replacing a photo invalidates pending segmentation');
   await page.unroute('**/js/segment-worker.js');
-  await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'mobile-editor.png'),fullPage:true});check('Mobile layout fits viewport');
+  for(const width of [390,820]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));const toolbar=await page.locator('#modes').boundingBox(),photo=await page.locator('#poster').boundingBox();assert.ok(toolbar.y+toolbar.height<=photo.y);await page.evaluate(()=>scrollTo(0,500));assert.ok(await page.evaluate(()=>scrollY>0));await page.evaluate(()=>scrollTo(0,0));}
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(output,'mobile-editor.png'),fullPage:true});check('Mobile and tablet use normal page scrolling with toolbar above the image');
   await page.setViewportSize({width:1280,height:950});
   if(process.env.STUDIO_PHOTO&&process.env.STUDIO_MASK&&process.env.STUDIO_META){
     await page.locator('#background-file').setInputFiles(process.env.STUDIO_PHOTO);await page.locator('#circle-file').setInputFiles(process.env.STUDIO_PHOTO);
