@@ -48,11 +48,12 @@ export function dimensions(buffer) {
   }
   throw Error('Use a valid JPEG, PNG or non-animated WebP photograph.');
 }
-export async function loadImage(file) {
+export async function loadImage(file, { beforeDecode } = {}) {
   if (!file || file.size > MAX_BYTES) throw Error('Choose a photograph under 25 MB.');
   const header = dimensions(await file.arrayBuffer());
   if (!header.width || !header.height || header.width * header.height > MAX_PIXELS || Math.max(header.width, header.height) > 16000)
     throw Error('This photo exceeds the 16 megapixel editing limit. Export a smaller copy; the editor will not silently reduce your original.');
+  beforeDecode?.(header);
   const bitmap = await createImageBitmap(new Blob([file], { type: header.type }), { imageOrientation: 'from-image' });
   try {
     return { bitmap, file, width: bitmap.width, height: bitmap.height, hash: await digest(file) };

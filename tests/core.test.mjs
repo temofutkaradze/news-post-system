@@ -3,6 +3,25 @@ import assert from 'node:assert/strict';
 import { fit, circleRect, cropTags } from '../docs/js/geometry.js';
 import { dimensions } from '../docs/js/images.js';
 import { Mask, brush, keepConnected, validateMetadata } from '../docs/js/masks.js';
+import { createState, addCircle, selectCircle, removeCircle, reorderCircle, bulkEffect, hitCircle, projectEstimate, projectBudget, missingMasks } from '../docs/js/state.js';
+
+test('stable circle identities, independent settings, bulk selection and layer order',()=>{
+  const s=createState(),a=s.circle,b=addCircle(s),c=addCircle(s);a.source=b.source=c.source={width:120,height:150};
+  a.pop=true;b.smart=true;assert.equal(c.pop,false);assert.equal(c.smart,false);
+  selectCircle(s,a.id);s.layout.x=45;assert.equal(b.layout.x,30);assert.equal(c.layout.x,30);
+  selectCircle(s,c.id,true);bulkEffect(s,'pop',true);assert.equal(a.pop,true);assert.equal(c.pop,true);assert.equal(b.pop,false);
+  reorderCircle(s,a.id,1);assert.equal(s.circles[1],a);const id=c.id;removeCircle(s,c.id);assert.ok(!s.circles.some(x=>x.id===id));assert.notEqual(addCircle(s).id,id);
+  assert.ok(s.selectedIds.has(s.activeId));
+});
+test('hit selection follows front-to-back order and memory is image-based, not a three-circle cap',()=>{
+  const s=createState();for(let i=0;i<5;i++){const c=i?addCircle(s):s.circle;c.source={width:100,height:100};c.layout.x=30;}
+  assert.equal(hitCircle(s,324,297),s.circles.at(-1));assert.equal(s.circles.length,5);assert.ok(projectEstimate(s)<projectBudget(2));
+  assert.ok(projectEstimate(s,s.circle,{width:16000,height:16000})>projectBudget(2));
+});
+test('missing masks are reported per enabled circle and shared background only once',()=>{
+  const s=createState(),a=s.circle,b=addCircle(s);a.source=b.source={width:10,height:10};a.pop=true;a.smart=b.smart=true;
+  assert.deepEqual(missingMasks(s),[`${a.label} Pop-out`,'shared background foreground']);s.background.mask={};a.mask={};assert.deepEqual(missingMasks(s),[]);
+});
 
 test('cover geometry preserves aspect and clamps focal points without empty bars',()=>{
   assert.deepEqual(fit(100,100,100,200,{x:.5,y:.5,zoom:1}),{x:-50,y:0,w:200,h:200});

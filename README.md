@@ -5,7 +5,10 @@
 **Open https://temofutkaradze.github.io/news-post-system/** to edit and export entirely in your browser. No local Node service, bot, account or API key is required for the editor.
 
 - Keep both effects off for an ordinary circular inset. Move, resize, pinch, zoom and adjust focal points as before.
+- Use **Add circle +** for additional photographs. Select a circle in the list or on the canvas in either circle interaction mode; one inspector edits that circle. Check multiple list items (or Select all) for explicit bulk effect actions. Bring forward / Send backward controls overlapping layers; the list is front-to-back.
 - **Circle Pop-out** exposes the inset subject above the circle. **Smart Foreground** puts the background player in front of the inset and its white border. These are independent switches, both off initially.
+- Every circle has its own switches, transform and Pop-out mask. One background foreground mask is shared selectively across Smart Foreground circles. Missing masks are processed on demand, one at a time; moving or zooming never triggers inference. Export includes every circle and refuses enabled effects with missing masks.
+- The large left preview uses normal document scrolling. On desktop the right inspector is sticky and scrolls independently; the left workspace has no internal scrollbar.
 - Create masks on demand using the existing ISNet package (Compact or Detailed); models are never loaded at startup. Optional Subject area selection constrains inference without changing the photographic composition.
 - **Refine** offers Add, Erase, adjustable softness/size, zoom/pan, one-operation Undo and explicit connected-person selection. Check detached fingers and spectators; automatic masks are not infallible.
 - Import aligned transparent circle cutouts, or full-source MODNet grayscale masks with source-bound metadata. Final RGB always comes from the original photograph, never the model output or a recompressed JPEG.
