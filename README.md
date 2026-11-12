@@ -1,5 +1,25 @@
 # News Post System
 
+## News Post Studio — browser editor
+
+**Open https://temofutkaradze.github.io/news-post-system/** to edit and export entirely in your browser. No local Node service, bot, account or API key is required for the editor.
+
+- Keep both effects off for an ordinary circular inset. Move, resize, pinch, zoom and adjust focal points as before.
+- **Circle Pop-out** exposes the inset subject above the circle. **Smart Foreground** puts the background player in front of the inset and its white border. These are independent switches, both off initially.
+- Create masks on demand using the existing ISNet package (Compact or Detailed); models are never loaded at startup. Optional Subject area selection constrains inference without changing the photographic composition.
+- **Refine** offers Add, Erase, adjustable softness/size, zoom/pan, one-operation Undo and explicit connected-person selection. Check detached fingers and spectators; automatic masks are not infallible.
+- Import aligned transparent circle cutouts, or full-source MODNet grayscale masks with source-bound metadata. Final RGB always comes from the original photograph, never the model output or a recompressed JPEG.
+- Download the **complete poster** as 1080×1350 or 2160×2700 PNG, or high-quality JPEG. Transparent circle cutout download is a separate action. The 2× canvas does not create new source detail.
+- Manual/import editing never loads a model or sends photos elsewhere. Automatic processing downloads pinned third-party code/model assets and runs locally in a disposable worker.
+
+The legacy crop picker is preserved at [docs/legacy-crop-picker.html](docs/legacy-crop-picker.html). Crop tags remain available; the unchanged n8n workflow below does **not** reproduce browser-only masks or Smart Foreground. Use the editor's final-image download for those effects.
+
+See [editor operation and verification](docs/EDITOR.md), [privacy and license notices](docs/about.html), and [dependency provenance](docs/licenses/NOTICES.md). The browser editor is AGPL-3.0-or-later with publicly available corresponding source.
+
+---
+
+## Existing Telegram / n8n workflow
+
 Turn a Telegram message into a ready-to-post **football news quote card** (1080x1350 design, rendered at 2x = **2160x2700 PNG**).
 
 Send a background image and a caption to your Telegram bot; an n8n workflow builds the card with auto-sized text, highlighted words and an optional circular inset photo, then sends the PNG back to you.
